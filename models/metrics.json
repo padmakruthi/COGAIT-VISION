@@ -1,0 +1,53 @@
+{
+    "Support Vector Machine": {
+        "Accuracy": 100.0,
+        "Precision": 100.0,
+        "Recall": 100.0,
+        "F1_Score": 100.0,
+        "ROC_AUC": 1.0,
+        "Confusion_Matrix": [
+            [
+                188,
+                0
+            ],
+            [
+                0,
+                187
+            ]
+        ]
+    },
+    "Random Forest": {
+        "Accuracy": 100.0,
+        "Precision": 100.0,
+        "Recall": 100.0,
+        "F1_Score": 100.0,
+        "ROC_AUC": 1.0,
+        "Confusion_Matrix": [
+            [
+                188,
+                0
+            ],
+            [
+                0,
+                187
+            ]
+        ]
+    },
+    "XGBoost": {
+        "Accuracy": 99.73,
+        "Precision": 99.47,
+        "Recall": 100.0,
+        "F1_Score": 99.73,
+        "ROC_AUC": 1.0,
+        "Confusion_Matrix": [
+            [
+                187,
+                1
+            ],
+            [
+                0,
+                187
+            ]
+        ]
+    }
+}

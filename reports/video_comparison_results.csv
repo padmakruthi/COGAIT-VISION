@@ -1,0 +1,3 @@
+Video,total_tug_duration,sit_to_stand_duration,stand_to_sit_duration,walking_speed,cadence,step_length_norm,stride_variability,turning_duration,trunk_sway_angle,asymmetry_index,dual_task_cost,Verdict,Risk Score (%)
+Normal Walk (Healthy),7.6,1.1,1.3,1.05,105.0,0.38,5.2,2.1,2.8,3.5,9.2,Healthy Normal,11.7
+Abnormal (Alzheimer Symptoms),15.8,2.2,2.4,0.68,72.0,0.22,12.8,3.6,6.8,11.5,25.82,Potential Cognitive Impairment,78.4

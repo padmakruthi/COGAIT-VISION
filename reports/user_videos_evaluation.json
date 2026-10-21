@@ -1,0 +1,92 @@
+{
+    "normal_walk": {
+        "consensus_label": "Healthy Normal",
+        "average_impairment_probability": 11.7,
+        "alzheimer_warning_status": "🟢 NORMAL: No Significant Alzheimer's Motor Biomarkers Detected",
+        "alzheimer_warning_level": "NORMAL_LOW_RISK",
+        "clinical_advice": "Gait and functional mobility within age-adjusted healthy normative thresholds.",
+        "risk_stratification": "Low Risk / Normal Mobility Profile",
+        "risk_color": "#27ae60",
+        "model_breakdown": {
+            "SVM": {
+                "prediction": "Healthy / Low Risk",
+                "probability": 12.5,
+                "is_positive": false
+            },
+            "Random Forest": {
+                "prediction": "Healthy / Low Risk",
+                "probability": 11.2,
+                "is_positive": false
+            },
+            "XGBoost": {
+                "prediction": "Healthy / Low Risk",
+                "probability": 11.4,
+                "is_positive": false
+            }
+        },
+        "abnormal_biomarkers": [],
+        "input_features": {
+            "total_tug_duration": 7.6,
+            "sit_to_stand_duration": 1.1,
+            "stand_to_sit_duration": 1.3,
+            "walking_speed": 1.05,
+            "cadence": 105.0,
+            "step_length_norm": 0.38,
+            "stride_variability": 5.2,
+            "turning_duration": 2.1,
+            "trunk_sway_angle": 2.8,
+            "asymmetry_index": 3.5,
+            "dual_task_cost": 9.2
+        },
+        "total_frames_processed": 240,
+        "detected_landmark_frames": 237,
+        "annotated_video_path": "data/videos/annotated_normal.mp4"
+    },
+    "abnormal_walk": {
+        "consensus_label": "Potential Cognitive Impairment",
+        "average_impairment_probability": 78.4,
+        "alzheimer_warning_status": "🔴 ALZHEIMER'S SCREENING ALERT: High Risk of Cognitive Impairment Detected",
+        "alzheimer_warning_level": "HIGH_ALERT",
+        "clinical_advice": "Clinical neurological evaluation, MoCA / MMSE cognitive assessment, and specialist consultation recommended.",
+        "risk_stratification": "High Risk / Pronounced Cognitive-Motor Biomarkers",
+        "risk_color": "#c0392b",
+        "model_breakdown": {
+            "SVM": {
+                "prediction": "Impaired / At-Risk",
+                "probability": 82.82,
+                "is_positive": true
+            },
+            "Random Forest": {
+                "prediction": "Impaired / At-Risk",
+                "probability": 76.5,
+                "is_positive": true
+            },
+            "XGBoost": {
+                "prediction": "Impaired / At-Risk",
+                "probability": 75.88,
+                "is_positive": true
+            }
+        },
+        "abnormal_biomarkers": [
+            "High Dual-Task Motor Interference (> 22%)",
+            "Reduced Walking Velocity (< 0.85 m/s)",
+            "Elevated Stride Variability"
+        ],
+        "input_features": {
+            "total_tug_duration": 15.8,
+            "sit_to_stand_duration": 2.2,
+            "stand_to_sit_duration": 2.4,
+            "walking_speed": 0.68,
+            "cadence": 72.0,
+            "step_length_norm": 0.22,
+            "stride_variability": 12.8,
+            "turning_duration": 3.6,
+            "trunk_sway_angle": 6.8,
+            "asymmetry_index": 11.5,
+            "dual_task_cost": 25.82
+        },
+        "total_frames_processed": 240,
+        "detected_landmark_frames": 240,
+        "annotated_video_path": "data/videos/annotated_abnormal.mp4"
+    }
+}
