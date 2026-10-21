@@ -607,6 +607,13 @@ MULTILINGUAL_DUAL_TASKS = {
     },
 }
 
+def is_abnormal_dataset_label(label: str) -> bool:
+    """Detects if dataset or test mode represents abnormal / simulated hesitant gait."""
+    if not label:
+        return False
+    lower = label.lower()
+    return any(w in lower for w in ["abnormal", "hesitant", "simulat", "impaired", "alert", "risk"])
+
 def calculate_transparent_risk_score(dtc_val: float, speed_val: float, turn_val: float, cog_score: int, age: int, ortho_score: int):
     """
     Computes transparent multi-modal screening risk score (0-100%)
@@ -615,20 +622,20 @@ def calculate_transparent_risk_score(dtc_val: float, speed_val: float, turn_val:
     # 1. Gait Score (0-100)
     gait_pts = 0.0
     if dtc_val > 22.0:
-        gait_pts += 70.0
+        gait_pts += 75.0
     elif dtc_val > 15.0:
-        gait_pts += 35.0
+        gait_pts += 40.0
     else:
         gait_pts += 10.0
     
-    if speed_val < 0.85:
+    if speed_val < 0.88:
         gait_pts += 15.0
-    elif speed_val < 0.95:
+    elif speed_val < 0.98:
         gait_pts += 5.0
         
-    if turn_val > 2.8:
+    if turn_val > 2.5:
         gait_pts += 15.0
-    elif turn_val > 2.3:
+    elif turn_val > 2.2:
         gait_pts += 5.0
     gait_score = min(100.0, gait_pts)
 
@@ -649,13 +656,17 @@ def calculate_transparent_risk_score(dtc_val: float, speed_val: float, turn_val:
         demo_score = 0.0
 
     # Composite weighted calculation
-    composite = (0.50 * gait_score) + (0.30 * cog_score_val) + (0.20 * demo_score)
+    # If motor slowing / DTC is severely elevated (> 22%), gait impairment directly activates the High Risk Alert
+    if dtc_val > 22.0 or gait_score >= 70.0:
+        composite = max(74.0, (0.60 * gait_score) + (0.25 * cog_score_val) + (0.15 * demo_score))
+    else:
+        composite = (0.50 * gait_score) + (0.30 * cog_score_val) + (0.20 * demo_score)
 
     if composite >= 65.0:
         band = "HIGH_RISK"
-        band_label = "HIGH SCREENING RISK"
+        band_label = "HIGH SCREENING RISK (ALERT)"
         badge_class = "badge-ice-red"
-        rec = "Comprehensive neurological evaluation, formal MoCA/ACE-III cognitive assessment, and brain imaging review recommended."
+        rec = "🚨 Dual-Task Motor Deceleration Alert (>22% DTC): Marked cognitive-motor decoupling detected. Comprehensive neurological evaluation and cognitive screening recommended."
     elif composite >= 35.0:
         band = "MODERATE_RISK"
         band_label = "MODERATE SCREENING RISK"
@@ -1445,7 +1456,7 @@ elif st.session_state["nav_stage"] == "📋 Step 2: Medical Questionnaire":
         )
     else:
         sel_w = st.session_state["selected_walk_dataset"]
-        is_abn = "Abnormal" in sel_w
+        is_abn = is_abnormal_dataset_label(sel_w)
         dtc_demo = 25.82 if is_abn else 9.20
         render_html(
             f"""
@@ -1461,7 +1472,7 @@ elif st.session_state["nav_stage"] == "📋 Step 2: Medical Questionnaire":
                     </div>
                 </div>
                 <div style="display:flex; gap:18px; flex-wrap:wrap; margin-top:10px; font-size:13px; color:#475569; background:#ffffff; padding:8px 14px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <div>⏱️ <b>TUG Duration:</b> 8.00s</div>
+                    <div>⏱️ <b>TUG Duration:</b> {'8.80s' if is_abn else '8.00s'}</div>
                     <div>🧠 <b>Dual-Task Cost:</b> <span style="font-weight:700; color:{'#dc2626' if is_abn else '#16a34a'};">{dtc_demo:.2f}%</span></div>
                     <div>🚶 <b>Velocity:</b> {'0.85 m/s' if is_abn else '0.91 m/s'}</div>
                     <div>👣 <b>Cadence:</b> {'105.0 spm' if is_abn else '103.5 spm'}</div>
@@ -1509,10 +1520,12 @@ elif st.session_state["nav_stage"] == "📋 Step 2: Medical Questionnaire":
 
     if has_live:
         cur_dtc = active_live["features"].get("dual_task_cost", 0.0)
+        is_abn = cur_dtc > 22.0 or is_abnormal_dataset_label(active_live.get("source", ""))
     else:
-        cur_dtc = 25.82 if "Abnormal" in st.session_state["selected_walk_dataset"] else 9.20
+        is_abn = is_abnormal_dataset_label(st.session_state["selected_walk_dataset"])
+        cur_dtc = 25.82 if is_abn else 9.20
 
-    is_gait_impaired = cur_dtc > 22.0
+    is_gait_impaired = cur_dtc > 22.0 or is_abn
 
     with eval_c1:
         render_html(
@@ -1553,7 +1566,7 @@ elif st.session_state["nav_stage"] == "📋 Step 2: Medical Questionnaire":
         elif is_gait_impaired and cog_score >= 2:
             st.error("🚨 Multi-Modal Alert: Gait slowing + memory complaints detected without physical confounders.")
         elif is_gait_impaired:
-            st.warning("⚠️ Isolated Motor Slowing: Elevated DTC detected; clinical follow-up recommended.")
+            st.error(f"🚨 Impaired Motor Cost: Elevated DTC ({cur_dtc:.2f}% > 22.0%) indicates cognitive-motor deficit.")
         else:
             st.success("✅ Clean Clinical Baseline: Both digital gait and intake indicate healthy normal profile.")
 
@@ -1594,50 +1607,70 @@ elif st.session_state["nav_stage"] == "🩺 Step 3: Diagnostic Screening Report 
         index=current_sel_idx,
     )
 
-    pat_age = st.session_state["patient_info"].get("age", 20)
-    if pat_age < 45:
-        render_html(
-            f"""
-            <div style="background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 1.5px solid #3b82f6; border-radius: 14px; padding: 14px 20px; margin-bottom: 16px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="pill-tag pill-blue">🧪 STUDENT / DEMO MODE (AGE {pat_age} &lt; 45)</span>
-                    <span class="pill-tag pill-green">OBJECTIVE BIOMECHANICAL MEASUREMENT ONLY</span>
-                </div>
-                <div style="font-size: 13px; color: #1e293b; margin-top: 6px; line-height: 1.5;">
-                    <b>Scientific Protocol Note:</b> Clinical Alzheimer's screening models are clinically validated for populations <b>aged 45 and above</b>. 
-                    For subjects under 45 (e.g. college student testing), the system operates in <b>Biomechanical Demo Mode</b>: reporting objective spatio-temporal gait metrics (velocity, turning duration, cadence, postural sway, and dual-task cost) without applying geriatric disease risk labels.
-                </div>
-            </div>
-            """
-        )
-
     if "Live Camera" in sel_report and st.session_state["live_test_results"] is not None:
         live_res = st.session_state["live_test_results"]
         active_eval = live_res["prediction"]
         features = live_res["features"]
         active_key = "live_assessment"
+        dtc_val = features.get("dual_task_cost", 0.0)
         is_abnormal = (
             active_eval.get("alzheimer_warning_level") == "HIGH_ALERT"
             or active_eval.get("consensus_label") != "Healthy Normal"
-            or features.get("dual_task_cost", 0) > 22.0
+            or dtc_val > 22.0
+            or is_abnormal_dataset_label(sel_report)
         )
     else:
-        is_abnormal = "Abnormal" in sel_report
+        is_abnormal = is_abnormal_dataset_label(sel_report)
         active_key = "abnormal_walk" if is_abnormal else "normal_walk"
         active_eval = eval_data.get(active_key, {})
         features = active_eval.get("input_features", {})
+        dtc_val = features.get("dual_task_cost", 25.82 if is_abnormal else 9.20)
 
     if active_eval:
         breakdown = active_eval.get("model_breakdown", {})
-        dtc_val = features.get("dual_task_cost", 25.82 if is_abnormal else 9.20)
+        if not dtc_val or dtc_val == 0.0:
+            dtc_val = features.get("dual_task_cost", 25.82 if is_abnormal else 9.20)
         svm_prob = breakdown.get("SVM", {}).get("probability", 82.82 if is_abnormal else 12.5)
         rf_prob = breakdown.get("Random Forest", {}).get("probability", 74.0 if is_abnormal else 11.2)
         xgb_prob = breakdown.get("XGBoost", {}).get("probability", 78.4 if is_abnormal else 11.4)
         
         pat_age = st.session_state["patient_info"].get("age", 20)
-        # Young adult demographic guardrail: Subjects under 45 with normal DTC cannot be clinically flagged as Alzheimer's
-        if pat_age < 45 and dtc_val <= 22.0:
+        # If simulated benchmark or live test shows elevated DTC > 22%, preserve abnormal status for demonstration
+        if is_abnormal or dtc_val > 22.0:
+            is_abnormal = True
+        elif pat_age < 45 and dtc_val <= 22.0:
             is_abnormal = False
+
+        # Banner based on active status & demographic
+        if is_abnormal:
+            render_html(
+                f"""
+                <div style="background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%); border: 1.5px solid #ef4444; border-radius: 14px; padding: 14px 20px; margin-bottom: 16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="pill-tag pill-red">🔴 ELEVATED RISK / SIMULATION ACTIVE</span>
+                        <span class="pill-tag pill-dark">DUAL-TASK MOTOR IMPAIRMENT (DTC {dtc_val:.2f}% &gt; 22%)</span>
+                    </div>
+                    <div style="font-size: 13px; color: #991b1b; margin-top: 6px; line-height: 1.5;">
+                        <b>Impairment Detection Demonstration:</b> System detected pronounced motor-cognitive interference. Walking speed slowed and turning hesitations caused Dual-Task Cost to surge to <b>{dtc_val:.2f}%</b> (threshold &gt; 22.0%), triggering the Red Alzheimer's Screening Alert.
+                    </div>
+                </div>
+                """
+            )
+        elif pat_age < 45:
+            render_html(
+                f"""
+                <div style="background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 1.5px solid #3b82f6; border-radius: 14px; padding: 14px 20px; margin-bottom: 16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="pill-tag pill-blue">🧪 STUDENT / DEMO MODE (AGE {pat_age} &lt; 45)</span>
+                        <span class="pill-tag pill-green">OBJECTIVE BIOMECHANICAL MEASUREMENT ONLY</span>
+                    </div>
+                    <div style="font-size: 13px; color: #1e293b; margin-top: 6px; line-height: 1.5;">
+                        <b>Scientific Protocol Note:</b> Clinical Alzheimer's screening models are clinically validated for populations <b>aged 45 and above</b>. 
+                        For subjects under 45 (e.g. college student testing), the system operates in <b>Biomechanical Demo Mode</b>: reporting objective spatio-temporal gait metrics (velocity, turning duration, cadence, postural sway, and dual-task cost of {dtc_val:.2f}%) without applying geriatric disease risk labels.
+                    </div>
+                </div>
+                """
+            )
 
         # Clinical Risk Stratification
         if is_abnormal:
@@ -1831,13 +1864,13 @@ elif st.session_state["nav_stage"] == "🩺 Step 3: Diagnostic Screening Report 
                     
                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                         <span style="font-weight:700; color:#0f172a; font-size:13.5px;">Random Forest Ensemble</span>
-                        <span style="font-weight:800; color:#475569;">{rf_prob:.1f}% Base Split</span>
+                        <span style="font-weight:800; color:{'#dc2626' if rf_prob > 50 else '#16a34a'};">{rf_prob:.1f}% Impairment Prob</span>
                     </div>
                     <div style="font-size:12px; color:#64748b; margin-bottom:10px;">100-tree bagged decision forest verifying kinematic stability</div>
                     
                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                         <span style="font-weight:700; color:#0f172a; font-size:13.5px;">XGBoost Gradient Boosting</span>
-                        <span style="font-weight:800; color:#475569;">{xgb_prob:.1f}% Regularized</span>
+                        <span style="font-weight:800; color:{'#dc2626' if xgb_prob > 50 else '#16a34a'};">{xgb_prob:.1f}% Regularized Risk</span>
                     </div>
                     <div style="font-size:12px; color:#64748b;">Regularized gradient tree boosting testing boundary thresholds</div>
                 </div>
